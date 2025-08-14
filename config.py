@@ -15,8 +15,6 @@ ASRS_NAME="RR ASRS 001"
 # Environment configuration
 ENV_URL="http://localhost"
 ENV_TOKEN="autobootstrap"
-# ENV_URL="https://gateway-nippan-nakano-001-oksjpprod.ep-r.io"
-# ENV_TOKEN="Rapyuta!01nippan"
 
 # Container descriptor group settings
 AUDIT_DESCRIPTOR_GROUPS=[
