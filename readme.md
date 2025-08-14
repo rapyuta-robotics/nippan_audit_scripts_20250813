@@ -1,4 +1,4 @@
-Purpose
+## Purpose
 The provided scripts are used to create the audit tasks to perform cyclic audit over a period of time instead of performing full audit
 
 ## Configuration Parameters
@@ -42,10 +42,52 @@ These paths define where input and output files are located:
 
 ## Procedure
 
-### One time setup
+### Prerequisites
+- Python 3.8 or later
+- pip3 (Python package installer)
 
+### Environment Setup
+
+#### Automated Setup (Recommended)
 1. Clone this repo to a PC where the audit tasks are generated and provided to customers throughout the Cyclic audit period (eg. Edge server)
-2. Configure the ENV_URL and ENV_TOKEN aligned with the production environment
+2. Run the setup script to automatically configure your Python environment:
+   ```bash
+   ./setup.sh
+   ```
+   This script will:
+   - Check Python and pip installation
+   - Optionally create a virtual environment (recommended)
+   - Install required Python packages from `requirements.txt`
+   - Create necessary directories (`files` and `results`)
+
+#### Manual Setup
+If you prefer to set up the environment manually:
+
+1. Clone this repository
+2. Create a virtual environment (optional but recommended):
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+3. Install required packages:
+   ```bash
+   pip3 install -r requirements.txt
+   ```
+4. Create necessary directories:
+   ```bash
+   mkdir -p files results
+   ```
+
+#### Required Python Packages
+The script depends on the following external packages (automatically installed via `requirements.txt`):
+- `httpx>=0.24.0` - HTTP client for API requests
+- `requests>=2.28.0` - HTTP library for file downloads
+- `pandas>=1.5.0` - Data manipulation and analysis
+- `numpy>=1.21.0` - Numerical computing support
+
+### Configuration Setup
+
+1. Configure the ENV_URL and ENV_TOKEN in `config.py` aligned with the production environment
 
 ### Generation of Audit tasks and audit reports (this is to check the file audit output)
 
