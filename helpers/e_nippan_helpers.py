@@ -40,6 +40,7 @@ def save_container_inventory_csv():
 
             # Save the current inventory
             df.to_csv(config.ASRS_CURRENT_INVENTORY_PATH, index=False)
+            return True
         except:
             print("Initial inventory CSV error: Could not save the current inventory CSV file")
             return False
@@ -264,7 +265,7 @@ def update_per_bin_report_with_last_transaction():
         return False
 
     # Ensure the DF timestamp formats are correct
-    bins["stowDateTime"] = pd.to_datetime(bins["stowDateTime"])
+    bins["stowDateTime"] = pd.to_datetime(bins["stowDateTime"], errors="coerce")
     audit_per_bin_report["入出庫日"] = pd.to_datetime(audit_per_bin_report["入出庫日"])
 
     # Merge stow time onto every row of the same Bin
@@ -464,11 +465,9 @@ def generate_next_audits():
     # Sort by group and date, then shuffle rows within each (group, 入出庫日)
     sorted_bins = (
         eligeable_bins
-        .sort_values(["_grp", "入出庫日"], ascending=[True, True])
-        .groupby(["_grp", "入出庫日"], sort=False, group_keys=False)
-        .apply(lambda g: g.sample(frac=1))  # random within ties
-        .reset_index(drop=True)
+        .sort_values(["_grp", "入出庫日", "Bin"], ascending=[True, True, True])
         .drop(columns="_grp")
+        .reset_index(drop=True)
     )
 
     # Take only the number of required bins to do the audit
@@ -502,6 +501,7 @@ def generate_next_audits():
     # Saving the audit result in a CSV file
     try:
         pd.DataFrame(audit_next_task_rows).to_csv(config.AUDIT_NEXT_TASK_PATH, index=False)
+        return True
     except:
         print("Audit generation error: Could not save the next audit task CSV file")
         return False

@@ -13,10 +13,8 @@ AUDIT_DESCRIPTOR_GROUP="CX"    #Should be CX or 日販 or CX日販
 ASRS_NAME="RR ASRS 001"
 
 # Environment configuration
-# ENV_URL="http://localhost"
-# ENV_TOKEN="autobootstrap"
-ENV_URL="https://gateway-nippan-nakano-001-oksjpprod.ep-r.io"
-ENV_TOKEN="Rapyuta!01nippan"
+ENV_URL="http://localhost"
+ENV_TOKEN="autobootstrap"
 
 # Container descriptor group settings
 AUDIT_DESCRIPTOR_GROUPS=[
