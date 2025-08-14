@@ -1,10 +1,10 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #       Script user configuration
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-AUDIT_TASK_NUMBER=1 #The number of audit tasks to generate
-AUDIT_BIN_NUMBER=8  #The number of bins task to audit at once
+AUDIT_TASK_NUMBER=13 #The number of audit tasks to generate
+AUDIT_BIN_NUMBER=700  #The number of bins task to audit at once
 UPLOAD_GENERATED_AUDITS=False #Should the script upload automatically to WMS the audit tasks
-AUDIT_DESCRIPTOR_GROUP="日販"    #Should be CX or 日販 or CX日販
+AUDIT_DESCRIPTOR_GROUP="CX"    #Should be CX or 日販 or CX日販
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #       Script static configuration
@@ -13,8 +13,10 @@ AUDIT_DESCRIPTOR_GROUP="日販"    #Should be CX or 日販 or CX日販
 ASRS_NAME="RR ASRS 001"
 
 # Environment configuration
-ENV_URL="http://localhost"
-ENV_TOKEN="autobootstrap"
+# ENV_URL="http://localhost"
+# ENV_TOKEN="autobootstrap"
+ENV_URL="https://gateway-nippan-nakano-001-oksjpprod.ep-r.io"
+ENV_TOKEN="Rapyuta!01nippan"
 
 # Container descriptor group settings
 AUDIT_DESCRIPTOR_GROUPS=[
@@ -65,7 +67,6 @@ ASRS_CURRENT_INVENTORY_PATH="./files/asrs_current_inventory.csv"
 ASRS_INITIAL_INVENTORY_PATH="./files/asrs_initial_inventory_*.csv"
 AUDIT_EXPORT_PATH="./files/audit_export.csv"
 PER_BIN_AUDIT_REPORT="./results/Cycle1＆２実施状況(Bin別).csv"
-PER_SLOT_AUDIT_REPORT="./results/Cycle1＆２実施状況(Slot別).csv"
 AUDIT_NEXT_TASK_PATH="./results/次回棚卸し作業.csv"
 
 # Service URL configuration
@@ -89,4 +90,4 @@ DOCUMENT_URL="databridge/v1/documents/"
 OPERATION_URL="compute/v1/workflows/executions/"
 
 # Audit config
-DONE_AUDIT_STATUSES=["APPROVED","COMPLETED1"]
+NOT_PROCESSED_AUDIT_STATUSES=["CANCELLED"]

@@ -82,7 +82,7 @@ def save_container_inventory_csv():
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #       Audit report CSV initialization
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def initalize_audit_report_csvs():
+def initalize_audit_report_csv():
     print("Initializing audit reports based on container inventory information...")
 
     # Getting all audit relevant containers from WMS
@@ -90,20 +90,14 @@ def initalize_audit_report_csvs():
     if containers is False:
         return False
 
-    # Create the initial per slot audit report file
-    per_slot_audit_report_init = pd.DataFrame(
-        [
-            {"Bin": c["name"], "Slot数": i}
-            for c in containers
-            for i in range(1, int(c.get("partitionNumber", 1)) + 1)
-        ]
-    )
-
     # Create the initial per bin audit report file
     per_bin_audit_report_init = [
-        {"Bin": c["name"]}
+        {"Bin": c["name"],"Type":c["descriptorName"],"Slot数": c.get("partitionNumber")}
         for c in containers
     ]
+
+    # Convert to dataframe
+    per_bin_audit_report_init = pd.DataFrame(per_bin_audit_report_init)
 
     # Load the current CSV inventory
     try:
@@ -112,38 +106,37 @@ def initalize_audit_report_csvs():
         print("Audit report initialization error: Could not load the current CSV inventory file")
         return False
     
-    # Uploate the per slot audit report based on the initial invneotry
+    # Update the per bin lot audit report based on the initial inventory
     try:
-        # Aggregate current inventory per partition
-        agg = (current_container_inventory.groupby(["Inventory container", "Inventory index"])
+        # Aggregate current inventory per Bin
+        agg = (current_container_inventory.groupby(["Inventory container"])
                 .agg(
-                    商品数=("Inventory container", "size"),         # number of lines (SKUs) in the partition
-                    総Pcs=("Inventory quantity", "sum"),         # total pieces in the partition
+                    商品数=("Inventory container", "size"),         # number of lines (SKUs) in the bin
+                    総Pcs=("Inventory quantity", "sum"),         # total pieces in the bin
                 )
                 .reset_index())
 
-        # Rename columns to match per_slot_audit_report_init keys
+        # Rename columns to match per_bin_audit_report_init keys
         agg = agg.rename(columns={
-            "Inventory container": "Bin",
-            "Inventory index": "Slot数"
+            "Inventory container": "Bin"
         })
 
-        # Merge onto the per-slot template; fill missing with 0
-        per_slot_audit_report_init = (
-            per_slot_audit_report_init.merge(agg, on=["Bin", "Slot数"], how="left")
-                .fillna({"商品数": 0, "総Pcs": 0})
+        # Merge onto the per-bin template; fill missing with 0
+        per_bin_audit_report_init = (
+            per_bin_audit_report_init
+                .merge(agg, on='Bin', how='left')
+                .fillna({'商品数': 0, '総Pcs': 0, 'Slot数': 0})
         )
 
         # Cast to int
-        per_slot_audit_report_init[["商品数", "総Pcs"]] = \
-            per_slot_audit_report_init[["商品数", "総Pcs"]].astype(int)
-    except:
-        print("Audit report initialization error: Inital container inventory and per slot audit merger could not happen")
+        per_bin_audit_report_init[["Slot数", "商品数", "総Pcs"]] = \
+            per_bin_audit_report_init[["Slot数","商品数", "総Pcs"]].astype(int)
+    except Exception as e:
+        print(f"Audit report initialization error: Initial container inventory and per bin slot audit merger could not happen: {e}")
         return False
 
     # Save the initial reports as CSV files
     try:
-        pd.DataFrame(per_slot_audit_report_init).to_csv(config.PER_SLOT_AUDIT_REPORT, index=False)
         pd.DataFrame(per_bin_audit_report_init).to_csv(config.PER_BIN_AUDIT_REPORT, index=False)
         return True
     except Exception as e:
@@ -204,10 +197,10 @@ def update_per_bin_report_with_stowing():
         return False
     
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#       Update the per slot audit report with last transaction
+#       Update the per bin audit report with last transaction
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def update_per_slot_report_with_last_transaction():
-    print("Updating the per slot audit report with last transaction...")
+def update_per_bin_report_with_last_transaction():
+    print("Updating the per bin audit report with last transaction...")
 
     # Get all the relevant Inventory transactions
     params = {
@@ -218,7 +211,6 @@ def update_per_slot_report_with_last_transaction():
             "DISPOSE_DAMAGED","DISPOSE_EXPIRED",
             "PICK_TRANSFER","PICK_SHORTAGE","PICK_DAMAGE",
             "EXPIRE","UNEXPIRE",
-            "AUDIT_SHORTAGE","AUDIT_OVERAGE",
             "SHIPPING","EXTERNAL_SHIPPING",
         ],
         "operationalSortOverride": True,
@@ -229,42 +221,40 @@ def update_per_slot_report_with_last_transaction():
         print("Audit report transaction update error: Could not get inventory transactions from WMS")
         return False
     
-    # Load the current per slot report
+    # Load the current per bin report
     try:
-        audit_per_slot_report = pd.read_csv(config.PER_SLOT_AUDIT_REPORT)
+        audit_per_bin_report = pd.read_csv(config.PER_BIN_AUDIT_REPORT)
     except:
-        print("Audit report transaction update error: Could not load the per slot audit report file")
+        print("Audit report transaction update error: Could not load the per bin audit report file")
         return False
 
     # Transactions list -> DataFrame
     inventory_transactions_df = pd.DataFrame(inventory_transactions)
     if (len(inventory_transactions_df)==0):
-        print("Audit report audits update error: Not inventory transaction in the system, no point to audit")
+        print("Audit report audits update error: No inventory transaction in the system, no point to audit")
         return False
 
     # Localize insertTime to the laptop timezone
     local_tz = datetime.now().astimezone().tzinfo
     inventory_transactions_df["insertTime"] = pd.to_datetime(inventory_transactions_df["insertTime"], utc=True).dt.tz_convert(local_tz).dt.tz_localize(None)
 
-    # Build (Bin, Slot数, insertTime) from source and destination
-    src = inventory_transactions_df[["sourceContainerName", "sourceContainerPartitionIndex", "insertTime"]].rename(
-        columns={"sourceContainerName": "Bin", "sourceContainerPartitionIndex": "Slot数"}
+    # Build (Bin, insertTime) from source and destination
+    src = inventory_transactions_df[["sourceContainerName", "insertTime"]].rename(
+        columns={"sourceContainerName": "Bin"}
     )
-    dst = inventory_transactions_df[["destinationContainerName", "destinationContainerPartitionIndex", "insertTime"]].rename(
-        columns={"destinationContainerName": "Bin", "destinationContainerPartitionIndex": "Slot数"}
+    dst = inventory_transactions_df[["destinationContainerName", "insertTime"]].rename(
+        columns={"destinationContainerName": "Bin"}
     )
 
-    both = pd.concat([src, dst], ignore_index=True).dropna(subset=["Bin", "Slot数"])
-    both["Slot数"] = both["Slot数"].astype(int)
+    both = pd.concat([src, dst], ignore_index=True).dropna(subset=["Bin"])
 
-    # Latest time per (Bin, Slot数)
-    latest = both.groupby(["Bin", "Slot数"], as_index=False)["insertTime"].max().rename(
+    # Latest time per Bin
+    latest = both.groupby(["Bin"], as_index=False)["insertTime"].max().rename(
         columns={"insertTime": "入出庫日"}
     )
 
     # Merge into the audit report
-    audit_per_slot_report["Slot数"] = audit_per_slot_report["Slot数"].astype(int)
-    audit_per_slot_report = audit_per_slot_report.merge(latest, on=["Bin", "Slot数"], how="left")
+    audit_per_bin_report = audit_per_bin_report.merge(latest, on=["Bin"], how="left")
 
     # Load the current bin file
     try:
@@ -275,10 +265,10 @@ def update_per_slot_report_with_last_transaction():
 
     # Ensure the DF timestamp formats are correct
     bins["stowDateTime"] = pd.to_datetime(bins["stowDateTime"])
-    audit_per_slot_report["入出庫日"] = pd.to_datetime(audit_per_slot_report["入出庫日"])
+    audit_per_bin_report["入出庫日"] = pd.to_datetime(audit_per_bin_report["入出庫日"])
 
     # Merge stow time onto every row of the same Bin
-    m = audit_per_slot_report.merge(
+    m = audit_per_bin_report.merge(
         bins[["name", "stowDateTime"]],
         left_on="Bin", right_on="name", how="left"
     )
@@ -286,31 +276,31 @@ def update_per_slot_report_with_last_transaction():
     # Replace 入出庫日 with the later of (入出庫日, stowDateTime); NaT will be replaced
     m["入出庫日"] = m[["入出庫日", "stowDateTime"]].max(axis=1)
 
-    # Clean up the unuased columns
-    audit_per_slot_report = m.drop(columns=["name", "stowDateTime"])
+    # Clean up the unused columns
+    audit_per_bin_report = m.drop(columns=["name", "stowDateTime"])
 
-    # ensure it's datetime (NaT-friendly)
-    audit_per_slot_report["入出庫日"] = pd.to_datetime(audit_per_slot_report["入出庫日"], errors="coerce")
+    # Convert to date (NaT-friendly)
+    audit_per_bin_report["入出庫日"] = pd.to_datetime(audit_per_bin_report["入出庫日"], errors="coerce").dt.date
 
     # Check all timestamps exist
-    success = audit_per_slot_report["入出庫日"].notna().all()
+    success = audit_per_bin_report["入出庫日"].notna().all()
     if success is False:
-        print("Audit report transaction update error: Some slots do not have a valid 入出庫日")
+        print("Audit report transaction update error: Some bins do not have a valid 入出庫日")
         return False
     
     # Overwrite the audit report file with new info
     try:
-        audit_per_slot_report.to_csv(config.PER_SLOT_AUDIT_REPORT, index=False)
+        audit_per_bin_report.to_csv(config.PER_BIN_AUDIT_REPORT, index=False)
         return True
     except:
         print("Audit report transaction update error: Could not save the updated audit report file")
         return False
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#       Update the per slot audit report with audits
+#       Update the per bin audit report with audits
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def update_per_slot_report_with_audits():
-    print("Updating the audit reports with audit results...")
+def update_per_bin_report_with_audits():
+    print("Updating the audit report with audit results...")
     # Find the initial inventory file and extract the name
     matches = sorted(Path().glob(config.ASRS_INITIAL_INVENTORY_PATH))
     if matches:
@@ -342,8 +332,8 @@ def update_per_slot_report_with_audits():
         print("Audit report audits update error: Could not get audits from WMS")
         return False
 
-    # Filter all audits which are done
-    completed_audits=[audit for audit in audits if audit['status'] in config.DONE_AUDIT_STATUSES]
+    # Filter all audits which are or ongoing
+    completed_audits=[audit for audit in audits if audit['status'] not in config.NOT_PROCESSED_AUDIT_STATUSES]
 
     # Keep just the UUIDs
     audit_ids=[{"id": audit.get("id")} for audit in completed_audits]
@@ -386,7 +376,6 @@ def update_per_slot_report_with_audits():
     # Ensure datetime for correct ordering# ensure datetime for correct ordering
     audit_export_per_bin["Audit insert time"] = pd.to_datetime(audit_export_per_bin["Audit insert time"], errors="coerce", utc=True).dt.tz_convert(local_tz).dt.tz_localize(None)
 
-
     # Order audits per bin and rank them
     audit_export_per_bin = audit_export_per_bin.sort_values(["Audit container name", "Audit insert time"])
     audit_export_per_bin["order"] = audit_export_per_bin.groupby("Audit container name").cumcount() + 1
@@ -412,107 +401,70 @@ def update_per_slot_report_with_audits():
         .merge(cycle2, on="Bin", how="left")
     )
 
-    # Import the per slot audit report
-    try:
-        per_slot_audit_report = pd.read_csv(config.PER_SLOT_AUDIT_REPORT)
-    except:
-        print("Audit report audits update error: Could not load the per slot audit report CSV file")
-        return False
-
-    # Merge onto the per-slot report by Bin (same values for all Slot数 of that Bin)
-    per_slot_audit_report = (
-        per_slot_audit_report
-            .merge(cycle1, on="Bin", how="left")
-            .merge(cycle2, on="Bin", how="left")
-    )
-
     # Convert all reports date time to dates
-    slot_cols = ["入出庫日", "Cycle1実施日", "Cycle2実施日"]
     bin_cols  = ["Cycle1実施日", "Cycle2実施日"]
     per_bin_audit_report[bin_cols] = per_bin_audit_report[bin_cols].apply(
-        lambda s: pd.to_datetime(s, errors="coerce").dt.date
-    )
-    per_slot_audit_report[slot_cols] = per_slot_audit_report[slot_cols].apply(
         lambda s: pd.to_datetime(s, errors="coerce").dt.date
     )
     
     # Save the audit reports as CSV file
     try:
         pd.DataFrame(per_bin_audit_report).to_csv(config.PER_BIN_AUDIT_REPORT, index=False)
-        pd.DataFrame(per_slot_audit_report).to_csv(config.PER_SLOT_AUDIT_REPORT, index=False)
         return True
     except Exception as e:
         print(f"Audit report audits update error: Could not save the reports as CSVs: {e}")
         return False
-    
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #       Generate the next audit tasks
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def generate_next_audits():
     print("Generating next audits...")
-    # Import the per slot audit report
+    # Import the per bin audit report
     try:
-        per_slot_audit_report = pd.read_csv(config.PER_SLOT_AUDIT_REPORT)
+        per_bin_audit_report = pd.read_csv(config.PER_BIN_AUDIT_REPORT)
     except:
-        print("Audit generation error: Could not load the per slot audit report CSV file")
+        print("Audit generation error: Could not load the per bin audit report CSV file")
         return False
-    
+
     # Make sure the date format is correct
-    per_slot_audit_report["入出庫日"] = pd.to_datetime(per_slot_audit_report["入出庫日"], errors="coerce")
-    per_slot_audit_report["Cycle1実施日"] = pd.to_datetime(per_slot_audit_report["Cycle1実施日"], errors="coerce")
-    per_slot_audit_report["Cycle2実施日"] = pd.to_datetime(per_slot_audit_report["Cycle2実施日"], errors="coerce")
+    per_bin_audit_report["入出庫日"] = pd.to_datetime(per_bin_audit_report["入出庫日"], errors="coerce")
+    per_bin_audit_report["Cycle1実施日"] = pd.to_datetime(per_bin_audit_report["Cycle1実施日"], errors="coerce")
+    per_bin_audit_report["Cycle2実施日"] = pd.to_datetime(per_bin_audit_report["Cycle2実施日"], errors="coerce")
 
     # Make algo robust even if some 入出庫日 are NaT
-    idx = (
-        per_slot_audit_report.assign(_t=per_slot_audit_report["入出庫日"].fillna(pd.Timestamp.min))
-        .groupby("Bin")["_t"]
-        .idxmax()
+    per_bin_audit_report = (
+        per_bin_audit_report.assign(_t=per_bin_audit_report["入出庫日"].fillna(pd.Timestamp.min))
     )
-
-    # Only take entries with the latest value of 入出庫日 per bin
-    latest_per_bin = (
-        per_slot_audit_report.loc[idx, ["Bin", "入出庫日", "Cycle1実施日", "Cycle2実施日"]]
-        .sort_values("Bin")
-        .reset_index(drop=True)
-    )
-
-    # Import the bin file
-    try:
-        asrs_bins = pd.read_csv(config.ASRS_BIN_LIST_PATH)
-    except:
-        print("Audit generation error: Could not ASRS bin list CSV file")
-        return False
-    
-    # Filter ASRS bins based on AUDIT_DESCRIPTOR_LIST
-    asrs_bins = asrs_bins[asrs_bins["descriptorName"].isin(config.AUDIT_DESCRIPTOR_LIST)].reset_index(drop=True)
 
     # Filter the bins eligeable for audit by the remaining bins in ASRS bins
-    latest_per_bin = latest_per_bin[latest_per_bin["Bin"].isin(asrs_bins["name"])].reset_index(drop=True)
+    eligeable_bins = per_bin_audit_report[per_bin_audit_report["Type"].isin(config.AUDIT_DESCRIPTOR_LIST)].reset_index(drop=True)
 
     if (config.AUDIT_CYCLE_NUMBER==2):
         # Keep only the following cases:
         #  - group 0: Cycle1 missing
         #  - group 1: Cycle1 present & Cycle2 missing
-        mask0 = latest_per_bin["Cycle1実施日"].isna()
-        mask1 = latest_per_bin["Cycle1実施日"].notna() & latest_per_bin["Cycle2実施日"].isna()
-        latest_per_bin = latest_per_bin[mask0 | mask1].copy()
+        mask0 = eligeable_bins["Cycle1実施日"].isna()
+        mask1 = eligeable_bins["Cycle1実施日"].notna() & eligeable_bins["Cycle2実施日"].isna()
+        eligeable_bins = eligeable_bins[mask0 | mask1].copy()
 
         # add group key: 0 -> no Cycle1, 1 -> has Cycle1 but no Cycle2
-        latest_per_bin["_grp"] = np.where(mask0, 0, 1)
+        mask0 = eligeable_bins["Cycle1実施日"].isna()
+        eligeable_bins["_grp"] = np.where(mask0, 0, 1)
     else:
         # Keep only the following cases:
         #  - group 0: Cycle1 missing
-        mask0 = latest_per_bin["Cycle1実施日"].isna()
-        latest_per_bin = latest_per_bin[mask0].copy()
+        mask0 = eligeable_bins["Cycle1実施日"].isna()
+        eligeable_bins = eligeable_bins[mask0].copy()
 
         # add group key: 0 -> no Cycle1
-        latest_per_bin["_grp"] = 0
+        mask0 = eligeable_bins["Cycle1実施日"].isna()
+        eligeable_bins["_grp"] = 0
 
-    # sort by group and date, then shuffle rows within each (group, 入出庫日)
-    latest_per_bin = (
-        latest_per_bin
-        .sort_values(["_grp", "入出庫日"], ascending=[True, False])  # oldest first
+    # Sort by group and date, then shuffle rows within each (group, 入出庫日)
+    sorted_bins = (
+        eligeable_bins
+        .sort_values(["_grp", "入出庫日"], ascending=[True, True])
         .groupby(["_grp", "入出庫日"], sort=False, group_keys=False)
         .apply(lambda g: g.sample(frac=1))  # random within ties
         .reset_index(drop=True)
@@ -521,9 +473,9 @@ def generate_next_audits():
 
     # Take only the number of required bins to do the audit
     n = int(config.AUDIT_BIN_NUMBER)
-    selected_bin_names = latest_per_bin["Bin"].head(config.AUDIT_BIN_NUMBER).tolist()
-    if len(latest_per_bin) < n:
-        print(f"⚠️ Requested {config.AUDIT_BIN_NUMBER} bins, only {len(latest_per_bin)} available. Returning {len(selected_bin_names)}.")
+    selected_bin_names = sorted_bins["Bin"].head(config.AUDIT_BIN_NUMBER).tolist()
+    if len(sorted_bins) < n:
+        print(f"⚠️ Requested {config.AUDIT_BIN_NUMBER} bins, only {len(sorted_bins)} available. Returning {len(selected_bin_names)}.")
 
     # Suffle randomly the selected bins for more uniform audit
     random.shuffle(selected_bin_names)
@@ -549,7 +501,7 @@ def generate_next_audits():
 
     # Saving the audit result in a CSV file
     try:
-        pd.DataFrame(audit_next_task_rows, columns=["棚卸し作業名", "Bin"]).to_csv(config.AUDIT_NEXT_TASK_PATH, index=False)
+        pd.DataFrame(audit_next_task_rows).to_csv(config.AUDIT_NEXT_TASK_PATH, index=False)
     except:
         print("Audit generation error: Could not save the next audit task CSV file")
         return False

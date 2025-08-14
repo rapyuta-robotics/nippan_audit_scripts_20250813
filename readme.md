@@ -37,7 +37,6 @@ These paths define where input and output files are located:
 | Parameter | Default Path | Description |
 |-----------|-------------|-------------|
 | `PER_BIN_AUDIT_REPORT` | `./results/Cycle1＆２実施状況(Bin別).csv` | Per-bin audit report output path |
-| `PER_SLOT_AUDIT_REPORT` | `./results/Cycle1＆２実施状況(Slot別).csv` | Per-slot audit report output path |
 | `AUDIT_NEXT_TASK_PATH` | `./results/次回棚卸し作業.csv` | Next audit task output path |
 
 ## Procedure

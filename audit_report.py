@@ -2,10 +2,10 @@
 from helpers.d_audit_helpers import ongoing_audit_check
 from helpers.e_nippan_helpers import (
     save_container_inventory_csv,
-    initalize_audit_report_csvs,
+    initalize_audit_report_csv,
     update_per_bin_report_with_stowing,
-    update_per_slot_report_with_last_transaction,
-    update_per_slot_report_with_audits,
+    update_per_bin_report_with_last_transaction,
+    update_per_bin_report_with_audits,
     generate_next_audits,
     upload_next_audits,
 )
@@ -20,10 +20,10 @@ import config
 #       Main function
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # # Check that no audit is ongoing
-success=ongoing_audit_check()
-if success is False:
-    print("Audit ongoing error: Stopping script")
-    sys.exit(1)
+# success=ongoing_audit_check()
+# if success is False:
+#     print("Audit ongoing error: Stopping script")
+#     sys.exit(1)
 
 # Save the container inventory CSV file
 success=save_container_inventory_csv()
@@ -32,7 +32,7 @@ if success is False:
     sys.exit(1)
 
 # Initialize audit report files
-success=initalize_audit_report_csvs()
+success=initalize_audit_report_csv()
 if success is False:
     print("Audit report initialization error: Stopping script")
     sys.exit(1)
@@ -43,14 +43,14 @@ if success is False:
     print("Update bin file with stowing error: Stopping script")
     sys.exit(1)
 
-
-success=update_per_slot_report_with_last_transaction()
+# Update bin file with last transactions
+success=update_per_bin_report_with_last_transaction()
 if success is False:
     print("Update bin file with transactions error: Stopping script")
     sys.exit(1)
 
-# Update the Audit reports with audit
-success=update_per_slot_report_with_audits()
+# Update the Audit report with audit
+success=update_per_bin_report_with_audits()
 if success is False:
     print("Update bin file with audits error: Stopping script")
     sys.exit(1)
