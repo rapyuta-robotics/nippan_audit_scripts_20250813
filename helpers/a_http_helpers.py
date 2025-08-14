@@ -145,7 +145,7 @@ def http_get_all(client:str,endpoint:str,params:dict):
         "page": 1,
         "size": page_size
     }
-    merged_params=pagination | params
+    merged_params={**pagination, **params}
     response=http_get(client,endpoint,merged_params)
     if response is False:
         return False
