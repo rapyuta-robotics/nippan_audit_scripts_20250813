@@ -496,7 +496,11 @@ def generate_next_audits():
     for i, group in enumerate(audit_tasks, start=1):
         task_name = f"Audit_{now}_{i:02d}"
         for bin_name in group:
-            audit_next_task_rows.append({"棚卸し作業名": task_name, "Bin": bin_name})
+            audit_next_task_rows.append({
+                "Audit name": task_name,
+                "Container name": bin_name,
+                "Audit type": "CONTAINER"
+            })
 
     # Saving the audit result in a CSV file
     try:
@@ -522,9 +526,9 @@ def upload_next_audits():
     formatted_audit_tasks= [
         {
             "taskName": task,
-            "bins": [{"name": b} for b in group["Bin"].tolist()]
+            "bins": [{"name": b} for b in group["Container name"].tolist()]
         }
-        for task, group in next_audit_tasks.groupby("棚卸し作業名", sort=False)
+        for task, group in next_audit_tasks.groupby("Audit name", sort=False)
     ]
 
     # Upload the audit tasks to the WMS 
