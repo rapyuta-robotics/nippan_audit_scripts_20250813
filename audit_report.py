@@ -12,6 +12,7 @@ from helpers.e_nippan_helpers import (
 
 # Import libraries
 import sys
+from pathlib import Path
 
 # Import configurations
 import config
@@ -19,6 +20,10 @@ import config
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #       Main function
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Create folders for saving results
+Path("files").mkdir(parents=True, exist_ok=True)
+Path("results").mkdir(parents=True, exist_ok=True)
+
 # # Check that no audit is ongoing
 # success=ongoing_audit_check()
 # if success is False:

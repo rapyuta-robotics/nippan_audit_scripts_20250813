@@ -2,7 +2,7 @@
 #       Script user configuration
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 AUDIT_TASK_NUMBER=13 #The number of audit tasks to generate
-AUDIT_BIN_NUMBER=700  #The number of bins task to audit at once
+AUDIT_BIN_NUMBER=700  #The number of bins to audit in total
 UPLOAD_GENERATED_AUDITS=False #Should the script upload automatically to WMS the audit tasks
 AUDIT_DESCRIPTOR_GROUP="CX"    #Should be CX or 日販 or CX日販
 
